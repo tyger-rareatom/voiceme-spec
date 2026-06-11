@@ -1,0 +1,50 @@
+schema: spec-driven
+
+context: |
+  VoiceMe — multi-tenant AI voice-agent platform for African businesses. Embedded voice widgets
+  (one <script> tag, data-tenant attribute), RAG-grounded in each tenant's own documents,
+  subscription-billed. See openspec/project.md for the full worldview — it is authoritative.
+
+  Stack: Python 3.12 + LiveKit Agents (voice/agent services, FastAPI control plane);
+  Go 1.22+ (perf-critical services: metering collector, media/SIP edge, telemetry);
+  TypeScript/Next.js (portal) + framework-free widget.js (embed);
+  PostgreSQL 16 + pgvector; Voyage embeddings (Standard tier); Vertex AI RAG Engine (Scale tier);
+  Claude Sonnet/Haiku (LLM, cost-routed 70/30); GCP primary; Stripe billing; Terraform IaC.
+
+  Architecture north star: ONE shared platform; audio runtime and RAG backend are per-tenant
+  configuration flags (audio_backend, rag_backend) resolved by the Tenant Config Router at
+  session setup — never per turn. Backends are plugins behind stable interfaces.
+
+  Non-negotiables (test these, don't trust these):
+  - Tenant isolation by construction: every data path requires tenant_id; cross-tenant access
+    must be provably impossible.
+  - Usage metering from day one: every backend emits usage via the mandatory callback; no
+    un-metered consumption path may ship.
+  - No silent single point of failure on the live-call path; fail gracefully to escalation.
+  - Grounded answers only: LLM context is bounded by the tenant's retrieved documents.
+  - Consent-governed audio capture (NDPR/POPIA): no consent → no training-eligible retention.
+  - End-to-end turn latency p50 ≤ 1.5s; instrument every segment (STT/LLM/TTS/retrieval).
+  - Vendors are swappable: no business logic may depend on a vendor SDK surface directly.
+  - Operative pricing is the enterprise card (Starter $2–5k / Growth $10–20k / Scale $30–60k);
+    the discarded $99/$499 placeholder pricing must never be implemented.
+
+rules:
+  proposal:
+    - State the user-visible impact explicitly
+    - State the rollback strategy (flag, version pin, or additive-only)
+    - Note which phase the change belongs to (MVP 1/2/3, Phase 4/5) and its prerequisites
+  specs:
+    - Use Given/When/Then scenarios under each requirement
+    - Every requirement must be testable; isolation and metering requirements must have
+      explicit negative-case scenarios (cross-tenant denial, un-metered path rejection)
+    - Use SHALL for normative requirements
+  design:
+    - Note conformance to the audio_backend / rag_backend interface where applicable
+    - State the tenant-isolation approach for any data-touching change
+    - Include a hot-path sequence note for any change touching the live-call path,
+      with its latency-budget impact
+    - Name the vendor interface wrapped (never call vendor SDKs from business logic)
+  tasks:
+    - Atomic, ~2-hour chunks, implementation-ready without further clarification
+    - Any isolation- or metering-touching change must include a dedicated test task
+    - Backend implementations must include a conformance-suite task
