@@ -23,9 +23,33 @@ not forked codebases. "Swap the engine, not the car."
   - **Gemini Live native audio** — single closed model, cheapest/min for covered languages.
   - **Self-hosted NVIDIA Riva (NIM)** — Parakeet/Canary ASR + swappable LLM slot (Claude ⇄ Nemotron) + Magpie TTS. Owns the weights → language moat + sovereign.
 - **RAG backend** is selected per tenant by a `rag_backend` flag:
-  - **pgvector + Voyage** — Starter/Growth, cheap at low volume.
+  - **pgvector + Vertex EU embeddings** — Starter/Growth, cheap at low volume.
   - **Vertex AI RAG Engine** — Scale, amortizes at volume + in-region residency.
 - **Routing rule:** language need picks audio · tier picks RAG · volume tips cascaded/Gemini → NVIDIA self-host. The router resolves backends **at session setup, not per turn** (latency budget).
+
+### MVP-1 architecture & hosting decision (current — settled 2026-06-12)
+
+> The three-backend north star above is the *timeless* design. For MVP 1 specifically, the following
+> is decided and the spec is steered by it:
+
+- **Runtime:** Cascaded is the **sole MVP-1 audio backend**, built **behind the `audio_backend` interface**.
+  Pay-per-use, ~\$0 idle — the right economics for proving the platform at low/uncertain traffic.
+- **Hosting:** the cascaded stack + control plane run in **GCP `europe-west3` (Frankfurt)** with LiveKit
+  agents in **`eu-central`**, and **every vendor pinned to its EU endpoint** (Deepgram EU, Cartesia EU,
+  Claude via Vertex EU, embeddings via Vertex EU). This collapses the would-be 4 transatlantic vendor
+  hops to **zero**; the only ocean-ish leg is a single user→Frankfurt media hop, cushioned by LiveKit's edge.
+- **Why Frankfurt (not `africa-south1`):** one region serves **both** the South African and Nigerian
+  markets from day one (one subsea hop each); gives a defensible **EU/GDPR data-residency** posture while
+  tenant residency needs are still unscoped; and — unlike `africa-south1`, which has **zero GPUs** — the EU
+  has H100/A100 capacity if a self-host fallback is ever needed. Stays on GCP, just a different region.
+- **NVIDIA self-host is deferred and explicitly gated.** Adopt it only when **(a)** a signed
+  **hard-residency anchor tenant** requires in-country data, or **(b)** a tenant crosses the **volume
+  inflection (~60k conversations/mo)** — and always as a new **interface plugin, never a platform rewrite**.
+  In-region GPU means a **sovereign provider** (Cassava SA, live; Kasi Lagos, ramping), **not** a hyperscaler
+  African region. The language moat cannot be built at MVP 1 regardless — it depends on consented production
+  audio that only accrues *after* launch (see `consent-capture`).
+- **Per-tenant carve-out:** when a hard-residency tenant signs, flip only **that** tenant's
+  `audio_backend`/region in the config store to a sovereign-provider deployment; the EU default is untouched.
 
 ## 3. Non-negotiable principles
 
@@ -48,11 +72,17 @@ not forked codebases. "Swap the engine, not the car."
 - **Voice/agent services:** Python 3.12, LiveKit Agents framework. FastAPI for control-plane APIs.
 - **Performance-critical / DevOps services** (metering collector, media/SIP edge, telemetry): Go 1.22+ where throughput or concurrency justifies it.
 - **Portal & widget:** TypeScript, Next.js (portal), a framework-free `widget.js` embed bundle.
-- **Data:** PostgreSQL 16 + `pgvector`; Voyage AI embeddings (Standard); Vertex AI RAG Engine (Scale).
+- **Data:** PostgreSQL 16 + `pgvector`; **Vertex AI `gemini-embedding-001` embeddings via the EU endpoint**
+  (768-dim MRL-trimmed to stay under pgvector's 2000-dim hnsw limit); Vertex AI RAG Engine (Scale).
+  *Voyage is out of the MVP-1 path* — the embedding-provider interface stays for swappability.
 - **LLM:** Claude (Sonnet anchor + Haiku trivial-turn routing); self-hosted Nemotron via NIM (sovereign, spike-gated).
 - **Speech:** Deepgram (STT), Cartesia (TTS) for cascaded; Gemini Live; NVIDIA Riva (Parakeet/Canary/Magpie) self-hosted.
 - **Transport:** LiveKit (WebRTC); SIP trunk + WhatsApp Business adapters via a channel-ingress layer.
-- **Cloud:** GCP primary. Region note: GCP's nearest African region is `africa-south1` (Johannesburg) — farther from Lagos; validate latency for the Nigerian beachhead and confirm Vertex RAG Engine regional availability.
+- **Cloud:** GCP primary. **MVP-1 region is `europe-west3` (Frankfurt)** — not `africa-south1` — because all
+  cascaded vendors have EU endpoints there (zero transatlantic hops) and it serves both SA + Nigeria from one
+  region with an EU/GDPR residency posture (see §2 MVP-1 decision). `africa-south1` is rejected for MVP 1: it
+  has **zero GPUs** and all vendors are remote from it. In-region GPU, if ever needed, comes from **sovereign
+  providers** (Cassava SA / Kasi Lagos), not a hyperscaler African region.
 - **Billing:** Stripe (subscription + metered overage).
 - **Infra/DevOps:** Infrastructure-as-Code (Terraform), containerized (Docker), CI/CD with automated tests, GPU orchestration for NIM (Year 1+). Observability first-class (metrics, traces, logs, per-tenant dashboards).
 
@@ -94,3 +124,7 @@ not forked codebases. "Swap the engine, not the car."
 - Language packs require **labelled Pidgin/Swahili audio data** (the true critical path), not just model access.
 - Nemotron tool-calling reliability is **spike-gated** before any sovereign agentic-actions commitment.
 - Single-engineer dependency risk on the platform/GPU role — staff a backup.
+- **MVP-1 hosting validation (open spikes):** (1) Deepgram **Nigerian-accented-English WER** on real support
+  audio — the launch *language* gate; (2) **Joburg→Frankfurt live latency** probe — the weakest media leg
+  (~150-180ms); (3) Vertex **single-region `europe-west3`** embedding availability — only blocking if a tenant
+  demands named-region (EU multi-region endpoint covers the default GDPR posture).
