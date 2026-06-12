@@ -1,0 +1,55 @@
+# ── OS ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editors / IDEs ───────────────────────────────────────────────────
+.idea/
+*.swp
+*~
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# ── Secrets / local config ───────────────────────────────────────────
+# Never commit real credentials or machine-local overrides.
+.env
+.env.*
+!.env.example
+*.local
+.claude/settings.local.json
+
+# ── Python (docs/ holds scaffold scripts) ────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Node / OpenSpec tooling / future portal + widget ─────────────────
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+dist/
+build/
+.next/
+out/
+.turbo/
+
+# ── Logs & temp ──────────────────────────────────────────────────────
+*.log
+logs/
+tmp/
+.cache/
+coverage/
+
+# NOTE: .agent/ .claude/ .codex/ .github/ are intentionally TRACKED
+# (skills, commands, workflows, prompts). Do not ignore them — only the
+# machine-local .claude/settings.local.json is excluded above.
