@@ -8,7 +8,8 @@ context: |
   Stack: Python 3.12 + LiveKit Agents (voice/agent services, FastAPI control plane);
   Go 1.22+ (perf-critical services: metering collector, media/SIP edge, telemetry);
   TypeScript/Next.js (portal) + framework-free widget.js (embed);
-  PostgreSQL 16 + pgvector; Voyage embeddings (Standard tier); Vertex AI RAG Engine (Scale tier);
+  PostgreSQL 16 + pgvector; Vertex AI gemini-embedding-001 via EU endpoint (768-dim MRL);
+  Vertex AI RAG Engine (Scale tier);
   Claude Sonnet/Haiku (LLM, cost-routed 70/30); GCP primary; Stripe billing; Terraform IaC.
 
   Architecture north star: ONE shared platform; audio runtime and RAG backend are per-tenant
