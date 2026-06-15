@@ -8,6 +8,16 @@ The system SHALL expose `retrieve(tenant_id, query)` returning top-k chunks for 
 - WHEN retrieve(A, query) is called
 - THEN only tenant A chunks are returned, regardless of query content
 
+### Requirement: Retrieval metering and latency instrumentation
+The system SHALL treat query embedding plus vector search as the retrieval segment, and SHALL meter
+and instrument that segment per tenant.
+
+#### Scenario: Retrieval segment is measured
+- GIVEN a live-call turn that performs retrieval
+- WHEN the query is embedded and tenant chunks are searched
+- THEN query-embedding latency, vector-search latency, retrieval count, and tenant_id are emitted
+- AND the retrieval segment contributes to the live-call latency budget
+
 ### Requirement: Grounded-answer bounding
 The system SHALL pass only retrieved tenant context to the LLM for answer generation.
 

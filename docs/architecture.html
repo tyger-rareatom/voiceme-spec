@@ -67,6 +67,16 @@
   table.kv td{border-top:1px solid var(--line);padding:7px 8px;vertical-align:top}
   table.kv td:first-child{color:var(--muted);white-space:nowrap;width:170px}
   .pill{display:inline-block;padding:1px 8px;border-radius:12px;font-size:11px;border:1px solid var(--line);color:var(--muted)}
+  .gate{border:1px solid var(--accent);border-radius:11px;padding:12px 14px;background:rgba(88,166,255,.08)}
+  .gate h4,.risk h4{margin:0 0 6px;font-size:13px}
+  .gate ul,.risk ul{margin:6px 0 0;padding-left:18px;color:var(--muted);font-size:13px}
+  .risk{border:1px solid var(--vendor);border-radius:11px;padding:12px 14px;background:rgba(210,153,34,.08)}
+  .budget{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
+  .budget th,.budget td{border-top:1px solid var(--line);padding:6px 7px;text-align:left}
+  .budget th{color:var(--muted);font-weight:600}
+  .guardrail{border:1px solid var(--accent);border-radius:9px;padding:8px 10px;margin-top:10px;
+    background:rgba(88,166,255,.08);font-size:12px;color:var(--muted)}
+  .guardrail b{color:var(--ink)}
   footer{margin-top:40px;border-top:1px solid var(--line);padding-top:14px;color:var(--muted);font-size:12px}
   code{background:#0d1117;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:12px}
 </style>
@@ -89,6 +99,26 @@
   </div>
   <div class="flowdown">│ &nbsp; WebRTC via LiveKit global edge mesh &nbsp; ▼</div>
 
+  <div class="grid2">
+    <div class="gate">
+      <h4>Current build gate: MVP-1 only</h4>
+      <ul>
+        <li>MVP-1 ships with cascaded audio only; Gemini Live and NVIDIA remain future plugins.</li>
+        <li>Backend routing, RAG routing, tenant config, metering, failover, observability, and consent must land before scale-tier work starts.</li>
+        <li>Config changes apply on the next session, never mid-call.</li>
+      </ul>
+    </div>
+    <div class="risk">
+      <h4>Launch validation gates</h4>
+      <ul>
+        <li>Deepgram Nigerian-English WER on real support audio.</li>
+        <li>Joburg to Frankfurt live media latency probe.</li>
+        <li>Vertex EU embedding availability for ingest and call-time query embedding.</li>
+        <li>LLM routing verdict before Gemma receives any production traffic.</li>
+      </ul>
+    </div>
+  </div>
+
   <div class="region">
     <div class="region-label">◇ GCP europe-west3 (FRANKFURT) + LiveKit eu-central — one region serves both markets, EU/GDPR residency</div>
 
@@ -100,8 +130,9 @@
         <div class="box"><div class="t">tenant-provisioning</div><div class="d">tenant_id, RBAC, isolation by construction</div></div>
         <div class="box"><div class="t">tenant-config-store</div><div class="d">flags: tier · language · audio_backend · rag_backend</div></div>
         <div class="box"><div class="t">billing (Stripe)</div><div class="d">subscription + metered overage</div></div>
-        <div class="box"><div class="t">usage-metering</div><div class="d">collector — fed by mandatory usage callback</div></div>
+        <div class="box"><div class="t">usage-metering</div><div class="d">collector — usage callback, invoice reconciliation, margin dashboard</div></div>
       </div>
+      <div class="guardrail"><b>Tenant boundary:</b> config, RBAC, usage events, billing records, and CRM/escalation payloads are keyed by <code>tenant_id</code>; direct unscoped access is forbidden.</div>
     </div>
 
     <div class="flowdown">▼ &nbsp; entitlements + config read once at session setup &nbsp; ▼</div>
@@ -124,20 +155,31 @@
         <div class="arrow">→</div>
         <div class="stage"><div class="s">Retrieve</div><div class="v">pgvector · local</div><div class="ms">~30ms</div></div>
         <div class="arrow">→</div>
-        <div class="stage"><div class="s">LLM (routed)</div><div class="v">Claude EU · Gemma*</div><div class="ms">Haiku/Sonnet · ~250ms</div></div>
+        <div class="stage"><div class="s">LLM (routed)</div><div class="v">Claude EU</div><div class="ms">Haiku/Sonnet · ~250ms</div></div>
         <div class="arrow">→</div>
         <div class="stage"><div class="s">TTS</div><div class="v">Cartesia · EU</div><div class="ms">~120ms</div></div>
       </div>
       <div style="font-size:12px;color:var(--muted);margin-top:8px">
         + VAD turn-taking / barge-in · est. end-to-end <b>~1.2–1.6s</b> (zero transatlantic vendor hops) ·
-        <span class="pill">* Gemma candidate — gated by mvp1-llm-routing-spike</span>
+        <span class="pill">Gemma is blocked until mvp1-llm-routing-spike records a pass verdict</span>
       </div>
+      <table class="budget" aria-label="Live-call latency budget">
+        <thead><tr><th>Segment</th><th>Budget signal</th><th>Gate</th></tr></thead>
+        <tbody>
+          <tr><td>Media leg</td><td>Lagos ~100-130ms; Joburg ~150-180ms</td><td>Probe weakest leg before launch</td></tr>
+          <tr><td>STT</td><td>Deepgram EU, ~100ms target</td><td>WER + latency visible per tenant</td></tr>
+          <tr><td>Query embed + retrieve</td><td>Vertex EU + pgvector local, ~60ms target</td><td>Metered and included in retrieval SLO</td></tr>
+          <tr><td>LLM</td><td>Claude Haiku/Sonnet routing, ~250ms target</td><td>Model choice recorded in metering</td></tr>
+          <tr><td>TTS</td><td>Cartesia EU, ~120ms target</td><td>No silent failure; degrade to escalation</td></tr>
+        </tbody>
+      </table>
       <div class="row" style="margin-top:12px">
         <div class="box"><div class="t">crm-escalation</div><div class="d">human handoff + CRM webhook (+ context bundle)</div></div>
         <div class="box"><div class="t">consent-capture</div><div class="d">governed audio store — language-pack flywheel intake</div></div>
         <div class="box"><div class="t">failover-baseline</div><div class="d">graceful degrade — no dead-air hang</div></div>
         <div class="box"><div class="t">observability</div><div class="d">per-segment latency/error, per tenant + backend</div></div>
       </div>
+      <div class="guardrail"><b>Failure path:</b> STT, retrieval, LLM, TTS, or LiveKit transport faults trip health/circuit checks and route to a clear spoken failure, escalation, or callback offer. No silent retries that create dead air.</div>
     </div>
 
     <div class="flowdown">▼ &nbsp; rag_backend interface &nbsp; ▼</div>
@@ -150,6 +192,7 @@
         <div class="box data"><div class="t">PostgreSQL 16 + pgvector</div><div class="d">tenant-scoped; 768-dim gemini-embedding-001 vectors</div></div>
         <div class="box data"><div class="t">embeddings</div><div class="d">Vertex <code>gemini-embedding-001</code> EU · same model: ingest + query</div></div>
       </div>
+      <div class="guardrail"><b>Data boundary:</b> ingestion chunks, vector rows, retrieval calls, governed audio, retention policy, and export jobs all require <code>tenant_id</code>; cross-tenant denial tests are mandatory.</div>
     </div>
   </div>
 
@@ -160,7 +203,7 @@
       <div class="when">MVP 1 · now</div>
       <h4><span class="dot voice"></span>Cascaded</h4>
       <ul>
-        <li>Deepgram + Claude/Gemma + Cartesia</li>
+        <li>Deepgram + Claude + Cartesia</li>
         <li>Frankfurt / EU, pay-per-use</li>
         <li>The only MVP-1 backend</li>
       </ul>
@@ -171,7 +214,7 @@
       <ul>
         <li>Single native-audio model</li>
         <li>Value: latency + residency</li>
-        <li>Slots in via the interface — no rewrite</li>
+        <li>Blocked until audio interface, config store, and usage metering are archived</li>
       </ul>
     </div>
     <div class="card future">
@@ -180,7 +223,7 @@
       <ul>
         <li>Riva ASR + Magpie TTS + LLM slot</li>
         <li>Cassava SA / Kasi Lagos (sovereign GPU)</li>
-        <li>Gated: hard-residency tenant <i>or</i> volume inflection</li>
+        <li>Gated: hard-residency tenant or volume inflection, after consent and Nemotron spike gates</li>
       </ul>
     </div>
   </div>
@@ -195,7 +238,8 @@
         <tr><td>Hosting</td><td>GCP <code>europe-west3</code> (Frankfurt) + LiveKit <code>eu-central</code>; all vendors EU-pinned → zero transatlantic vendor hops</td></tr>
         <tr><td>Why not africa-south1</td><td>zero GPUs; in-region GPU = sovereign providers (Cassava/Kasi), not a hyperscaler region</td></tr>
         <tr><td>Embeddings</td><td>Voyage → Vertex <code>gemini-embedding-001</code> EU, 768-dim (under pgvector hnsw 2000-dim limit)</td></tr>
-        <tr><td>LLM</td><td>Claude Haiku/Sonnet cost-routed; Gemma 4 26B A4B candidate under spike</td></tr>
+        <tr><td>LLM</td><td>Claude Haiku/Sonnet cost-routed; Gemma 4 26B A4B is blocked until the spike records a production-routing verdict</td></tr>
+        <tr><td>Metering</td><td>Usage callback is mandatory; collector feeds billing, vendor invoice reconciliation, and per-tenant margin dashboard</td></tr>
         <tr><td>Residency</td><td>EU/GDPR interim posture; per-tenant sovereign carve-out to Cassava/Kasi</td></tr>
       </table>
     </div>

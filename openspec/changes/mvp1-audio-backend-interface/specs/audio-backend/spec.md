@@ -18,3 +18,13 @@ applicable) to the metering plane.
 - GIVEN any registered audio backend
 - WHEN a session ends
 - THEN a usage record is emitted with tenant_id, backend, and consumption metrics
+
+### Requirement: Backend conformance gate
+The system SHALL prevent any audio backend from registering unless it passes the conformance suite
+for lifecycle behavior, usage emission, and graceful error behavior.
+
+#### Scenario: Backend missing usage callback
+- GIVEN an audio backend implementation without a working usage callback
+- WHEN backend registration or conformance runs
+- THEN the backend fails conformance
+- AND it cannot be selected by the session router
