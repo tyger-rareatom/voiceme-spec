@@ -95,9 +95,9 @@
   <div class="users">
     <div class="user"><b>Lagos 🇳🇬</b><span>~100–130ms → Frankfurt</span></div>
     <div class="user"><b>Johannesburg 🇿🇦</b><span>~150–180ms → Frankfurt (weakest leg)</span></div>
-    <div class="user"><b>widget.js</b><span>one &lt;script&gt;, <code>data-tenant</code></span></div>
+    <div class="user"><b>widget.js</b><span>one &lt;script&gt;, <code>data-tenant</code> · web · mobile web · in-app (Android/iOS)</span></div>
   </div>
-  <div class="flowdown">│ &nbsp; WebRTC via LiveKit global edge mesh &nbsp; ▼</div>
+  <div class="flowdown">│ &nbsp; WebRTC via LiveKit global edge mesh — browser · mobile web · in-app WebView (native SDK later) &nbsp; ▼</div>
 
   <div class="grid2">
     <div class="gate">
@@ -129,7 +129,7 @@
         <div class="box"><div class="t">Portal (Next.js)</div><div class="d">agent-configuration: persona, hours, escalation</div></div>
         <div class="box"><div class="t">tenant-provisioning</div><div class="d">tenant_id, RBAC, isolation by construction</div></div>
         <div class="box"><div class="t">tenant-config-store</div><div class="d">flags: tier · language · audio_backend · rag_backend</div></div>
-        <div class="box"><div class="t">billing (Stripe)</div><div class="d">subscription + metered overage</div></div>
+        <div class="box"><div class="t">billing</div><div class="d"><code>billing_provider</code> iface · Stripe (global) + Paystack/Flutterwave (Africa); subscription + metered overage</div></div>
         <div class="box"><div class="t">usage-metering</div><div class="d">collector — usage callback, invoice reconciliation, margin dashboard</div></div>
       </div>
       <div class="guardrail"><b>Tenant boundary:</b> config, RBAC, usage events, billing records, and CRM/escalation payloads are keyed by <code>tenant_id</code>; direct unscoped access is forbidden.</div>
@@ -141,7 +141,7 @@
     <div class="plane voice">
       <h3><span class="dot voice"></span>Voice plane (live-call runtime)</h3>
       <div class="row">
-        <div class="box"><div class="t">channel-ingress</div><div class="d">WebRTC now · SIP / WhatsApp stubbed</div></div>
+        <div class="box"><div class="t">channel-ingress</div><div class="d">WebRTC now · SIP / WhatsApp stubbed (MVP 2 carriers: Telnyx / Africa's Talking)</div></div>
         <div class="box"><div class="t">Session Router</div><div class="d">resolves backend + RAG + agent config <b>at setup, not per turn</b></div></div>
       </div>
 
@@ -228,6 +228,39 @@
     </div>
   </div>
 
+  <!-- EDGE SEAMS: CHANNELS & BILLING -->
+  <h2 class="section">Edge seams — vendor-agnostic channels &amp; billing</h2>
+  <div class="grid3">
+    <div class="card">
+      <div class="when">MVP 1 · now → MVP 2</div>
+      <h4><span class="dot voice"></span>Widget ubiquity</h4>
+      <ul>
+        <li>Same <code>widget.js</code> everywhere: desktop &amp; mobile web + <b>in-app Android/iOS</b></li>
+        <li>All WebRTC (browser↔cloud); no phone network in MVP 1</li>
+        <li><b>WebView now, native SDK later</b> — WebView weakens mic / echo-cancel / barge-in vs the p50 ≤1.5s budget; native is a planned upgrade, not an accident</li>
+      </ul>
+    </div>
+    <div class="card future">
+      <div class="when">MVP 2</div>
+      <h4><span class="dot future"></span>Channel carriers (behind channel-ingress)</h4>
+      <ul>
+        <li>SIP / PSTN "dial a real number" + WhatsApp adapters</li>
+        <li><b>Telnyx</b> — cost, Standard tier (US/EU HQ)</li>
+        <li><b>Africa's Talking</b> — residency, Sovereign tier (in-region)</li>
+        <li>Carrier carries the call only — never the STT/LLM/TTS. Anti-fits: Vapi / Bland / Retell / Telnyx Voice AI bundle</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="when">MVP 1 · gap</div>
+      <h4><span class="dot control"></span>Billing providers</h4>
+      <ul>
+        <li>Stripe can't onboard NG/KE merchants (2026)</li>
+        <li><code>billing_provider</code> interface: <b>Stripe</b> (global) + <b>Paystack/Flutterwave</b> (Africa)</li>
+        <li>Tier entitlements provider-agnostic; only the charge/collect leg varies — verify recurring + metered on the African provider</li>
+      </ul>
+    </div>
+  </div>
+
   <!-- KEY DECISIONS -->
   <h2 class="section">Key decisions &amp; open validation</h2>
   <div class="grid2">
@@ -266,8 +299,11 @@
   <footer>
     Generated 2026-06-14 from <code>openspec/project.md</code> §2 and the MVP-1 change set
     (<code>mvp1-audio-cascaded</code>, <code>mvp1-knowledge-ingestion</code>, <code>mvp1-rag-retrieval</code>,
-    <code>mvp1-llm-routing-spike</code>). Reflects decisions on <code>main</code> as of PR #2.
-    Non-authoritative view — <code>project.md</code> remains the source of truth.
+    <code>mvp1-llm-routing-spike</code>). Updated 2026-06-21 with the CPaaS / billing provider-fit
+    exploration (channel carriers, widget ubiquity, <code>billing_provider</code> interface) captured in
+    the <code>mvp1-channel-ingress</code>, <code>mvp1-voice-widget</code>, and
+    <code>mvp1-billing-subscription</code> design notes. Non-authoritative view —
+    <code>project.md</code> remains the source of truth.
   </footer>
 
 </div>
