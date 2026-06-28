@@ -3,6 +3,13 @@
 ## Status
 **Phase: MVP 2 — Blocked by:** `mvp1-rag-retrieval`, `mvp1-tenant-config-store`.
 
+> **Re-scope pending (exploration decision):** the Scale/sovereign backend is now **AlloyDB AI
+> (ScaNN)**, not Vertex AI RAG Engine — one Postgres lineage (pgvector → AlloyDB → AlloyDB Omni) that
+> makes tier upgrades lift-and-shift and fills the sovereign-region hole. Rename to
+> `mvp2-rag-alloydb` and update the `rag-backend` / `rag-migration` spec deltas (which still name
+> Vertex) when formalized. Rationale in `design.md`. Vertex retained only as "considered, rejected
+> (adds an engine family + sovereign hole)."
+
 ## Why
 Scale-tier tenants need Vertex AI RAG Engine: its fixed node-hour cost amortizes at 100k+ min/month
 volume, and it provides the in-region data-residency posture sovereign procurement requires.

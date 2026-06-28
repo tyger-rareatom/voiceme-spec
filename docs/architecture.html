@@ -189,8 +189,14 @@
       <h3><span class="dot data"></span>Data &amp; knowledge layer</h3>
       <div class="row">
         <div class="box data"><div class="t">knowledge-ingestion</div><div class="d">chunk → embed (Vertex EU) → pgvector upsert; hash-keyed re-index</div></div>
-        <div class="box data"><div class="t">PostgreSQL 16 + pgvector</div><div class="d">tenant-scoped; 768-dim gemini-embedding-001 vectors</div></div>
+        <div class="box data"><div class="t">PostgreSQL 16 + pgvector</div><div class="d">tenant-scoped <b>per-tenant indexes</b>; 768-dim; warmed at session setup</div></div>
         <div class="box data"><div class="t">embeddings</div><div class="d">Vertex <code>gemini-embedding-001</code> EU · same model: ingest + query</div></div>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-top:8px">
+        <b>RAG scale path — one Postgres lineage:</b> pgvector (Standard) → AlloyDB + ScaNN (Growth/Scale)
+        → AlloyDB Omni (Sovereign). Same engine family → tier upgrades are lift-and-shift, migrated
+        <b>per-tenant on a RAM-headroom trigger</b> (non-destructive: build parallel → parity eval → flip
+        flag). Vertex RAG Engine dropped (extra engine family + sovereign-region hole).
       </div>
       <div class="guardrail"><b>Data boundary:</b> ingestion chunks, vector rows, retrieval calls, governed audio, retention policy, and export jobs all require <code>tenant_id</code>; cross-tenant denial tests are mandatory.</div>
     </div>
@@ -271,6 +277,7 @@
         <tr><td>Hosting</td><td>GCP <code>europe-west3</code> (Frankfurt) + LiveKit <code>eu-central</code>; all vendors EU-pinned → zero transatlantic vendor hops</td></tr>
         <tr><td>Why not africa-south1</td><td>zero GPUs; in-region GPU = sovereign providers (Cassava/Kasi), not a hyperscaler region</td></tr>
         <tr><td>Embeddings</td><td>Voyage → Vertex <code>gemini-embedding-001</code> EU, 768-dim (under pgvector hnsw 2000-dim limit)</td></tr>
+        <tr><td>RAG scale path</td><td>One Postgres lineage: pgvector (Standard) → AlloyDB+ScaNN (Growth/Scale) → AlloyDB Omni (Sovereign); per-tenant indexes warmed at setup. Migrate per-tenant on a RAM-headroom trigger, non-destructive. <b>Vertex RAG Engine dropped</b> (adds an engine family + sovereign hole)</td></tr>
         <tr><td>LLM</td><td>Claude Haiku/Sonnet cost-routed; Gemma 4 26B A4B is blocked until the spike records a production-routing verdict</td></tr>
         <tr><td>Metering</td><td>Usage callback is mandatory; collector feeds billing, vendor invoice reconciliation, and per-tenant margin dashboard</td></tr>
         <tr><td>Residency</td><td>EU/GDPR interim posture; per-tenant sovereign carve-out to Cassava/Kasi</td></tr>
@@ -302,7 +309,10 @@
     <code>mvp1-llm-routing-spike</code>). Updated 2026-06-21 with the CPaaS / billing provider-fit
     exploration (channel carriers, widget ubiquity, <code>billing_provider</code> interface) captured in
     the <code>mvp1-channel-ingress</code>, <code>mvp1-voice-widget</code>, and
-    <code>mvp1-billing-subscription</code> design notes. Non-authoritative view —
+    <code>mvp1-billing-subscription</code> design notes. Updated 2026-06-28 with the RAG vector-store
+    lineage decision (pgvector → AlloyDB → AlloyDB Omni; Vertex RAG Engine dropped; per-tenant indexes +
+    RAM-headroom migration trigger) captured in <code>mvp1-rag-retrieval</code> and
+    <code>mvp2-rag-vertex</code> design notes. Non-authoritative view —
     <code>project.md</code> remains the source of truth.
   </footer>
 
