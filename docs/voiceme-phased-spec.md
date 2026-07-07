@@ -740,6 +740,8 @@ interfaces built in MVP 1, with real failover and tier-upgrade migration.
 4. Sovereign deployment (in-region VPC, BYOK, audit logging, NDPR/POPIA/SARB controls)
 5. Tenant-isolation hardening (dedicated VPC/GPU for sovereign; noisy-neighbour controls)
 6. Scale-tier trial gating (real-traffic trial before pricing commitment)
+7. Session continuity (turn-boundary state checkpoints; resume-with-context on reconnect — the
+   substrate B→A failover hydrates from, so it precedes `mvp2-backend-failover`)
 
 ### Change: `mvp2-audio-gemini` (capability `audio-gemini`)
 - **proposal:** Add Gemini Live native audio behind the audio interface for covered-language, latency-

@@ -176,10 +176,11 @@
       <div class="row" style="margin-top:12px">
         <div class="box"><div class="t">crm-escalation</div><div class="d">human handoff + CRM webhook (+ context bundle)</div></div>
         <div class="box"><div class="t">consent-capture</div><div class="d">governed audio store — language-pack flywheel intake</div></div>
-        <div class="box"><div class="t">failover-baseline</div><div class="d">graceful degrade — no dead-air hang</div></div>
+        <div class="box"><div class="t">failover-baseline</div><div class="d">graceful degrade — no dead-air hang · breaker trips on 2 sequential timeouts or &gt;800ms (TTS), thresholds in config</div></div>
         <div class="box"><div class="t">observability</div><div class="d">per-segment latency/error, per tenant + backend</div></div>
       </div>
-      <div class="guardrail"><b>Failure path:</b> STT, retrieval, LLM, TTS, or LiveKit transport faults trip health/circuit checks and route to a clear spoken failure, escalation, or callback offer. No silent retries that create dead air.</div>
+      <div class="guardrail"><b>Failure path:</b> STT, retrieval, LLM, TTS, or LiveKit transport faults trip health/circuit checks and route to a clear spoken failure, escalation, or callback offer. No silent retries that create dead air. An open breaker fails fast — the graceful path starts within the turn budget, not after stacked vendor timeouts. <b>MVP 1 degrades gracefully; no second TTS vendor</b> ("stay-speaking" failover deferred to MVP-2 B→A, where the alternate backend brings its own TTS).</div>
+      <div class="guardrail"><b>Async boundary — persistence never blocks the audio loop:</b> from first audio frame to hangup the turn loop performs no synchronous durability writes (retrieval read is the only sync I/O in-loop). Metering: non-blocking buffer → local durable spool → at-least-once to the Go collector; spool pressure triggers admission control on <i>new</i> sessions (MVP-1 default alert-only), never turn degradation. Telemetry/logs shed under pressure; consent audio fails closed. A sink outage never adds turn latency.</div>
     </div>
 
     <div class="flowdown">▼ &nbsp; rag_backend interface &nbsp; ▼</div>
@@ -221,6 +222,7 @@
         <li>Single native-audio model</li>
         <li>Value: latency + residency</li>
         <li>Blocked until audio interface, config store, and usage metering are archived</li>
+        <li>B→A failover hydrates from <b>session-continuity checkpoints</b> (turn-boundary, async, Postgres) — that substrate lands first</li>
       </ul>
     </div>
     <div class="card future">
@@ -267,6 +269,39 @@
     </div>
   </div>
 
+  <!-- ENVIRONMENTS & PROMOTION -->
+  <h2 class="section">Environments &amp; promotion (mvp1-environments)</h2>
+  <div class="grid3">
+    <div class="card">
+      <div class="when">Two environments, not three</div>
+      <h4><span class="dot control"></span>Staging + Production</h4>
+      <ul>
+        <li>Separate <b>GCP projects</b>, same Terraform modules, same region <code>europe-west3</code> — parity by construction, scaled by replica count, never by omitting components</li>
+        <li>Per-environment vendor keys &amp; secrets; no credential valid in both. Stripe test mode in staging; all other vendors real EU endpoints</li>
+        <li>Local dev = docker-compose (documented, not spec'd); third pre-prod env rejected (~$0-idle economics)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="when">Promotion gate</div>
+      <h4><span class="dot voice"></span>merge → staging → gates → prod</h4>
+      <ul>
+        <li><b>Isolation suite</b> · <b>synthetic-call SLO probe</b> · <b>metering smoke test</b> — all pass or promotion blocks</li>
+        <li>Collector-outage chaos gate: kill collector, probe latency unchanged, spooled usage reconciles (zero loss)</li>
+        <li>Break-glass bypass: authz-restricted, audited, pages</li>
+        <li>Prod durability: Postgres PITR (stated RPO/RTO), budget alerts, pinned widget CDN (staging tracks latest)</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="when">Staging fixtures</div>
+      <h4><span class="dot data"></span>Probe &amp; seed tenants</h4>
+      <ul>
+        <li>Synthetic caller (LiveKit client, canned audio) measures per-segment latency vs the 1.5s p50 budget — per deploy + scheduled; tagged synthetic (visible in telemetry, excluded from billing)</li>
+        <li>Repeatable home for the launch spikes: Joburg→Frankfurt probe, Deepgram Nigerian-English WER corpus</li>
+        <li>Seed tenants AcmePay + TelcoOne double as isolation-suite fixtures; <b>no production data in staging, ever</b> (NDPR/POPIA)</li>
+      </ul>
+    </div>
+  </div>
+
   <!-- KEY DECISIONS -->
   <h2 class="section">Key decisions &amp; open validation</h2>
   <div class="grid2">
@@ -281,6 +316,12 @@
         <tr><td>LLM</td><td>Claude Haiku/Sonnet cost-routed; Gemma 4 26B A4B is blocked until the spike records a production-routing verdict</td></tr>
         <tr><td>Metering</td><td>Usage callback is mandatory; collector feeds billing, vendor invoice reconciliation, and per-tenant margin dashboard</td></tr>
         <tr><td>Residency</td><td>EU/GDPR interim posture; per-tenant sovereign carve-out to Cassava/Kasi</td></tr>
+        <tr><td>Vendor failure (MVP 1)</td><td><b>Degrade gracefully</b> — spoken failure / escalation / callback; no second TTS vendor. Breaker: 2 sequential timeouts or &gt;800ms (TTS), config-driven; open breaker fails fast within the turn budget</td></tr>
+        <tr><td>Persistence rule</td><td><b>Never blocks the audio loop</b>: async per event class — metering lossless (durable spool + at-least-once, admission control on new sessions), telemetry sheds, consent audio fails closed</td></tr>
+        <tr><td>Environments</td><td>Staging + prod as separate GCP projects, same modules/region; promotion gated on isolation + probe SLO + metering smoke; no prod data in staging</td></tr>
+        <tr><td>Session continuity</td><td>MVP-2: one serializable session state (seeded in cascaded runtime; same shape as the escalation bundle), turn-boundary async checkpoints to Postgres; resume = last completed turn, child session with parent link. <b>Warm-standby "caller never notices" rejected</b>. Precedes B→A failover</td></tr>
+        <tr><td>Language placement</td><td>Per-call logic → Python/LiveKit Agents (framework leverage; turns are vendor-I/O-bound); platform-wide fan-in &amp; media plane → Go (collector, telemetry, future SIP edge). <b>Go rewrite of the voice runtime rejected</b></td></tr>
+        <tr><td>Scalability-proposal review</td><td>Rejected: Qdrant/Pinecone (breaks Postgres lineage), Kafka/RabbitMQ (Pub/Sub + Go collector suffice), Cloudflare LB in the media path (LiveKit edge owns it), fully stateless orchestrators (agents are stateful by design)</td></tr>
       </table>
     </div>
     <div class="card">
@@ -312,7 +353,12 @@
     <code>mvp1-billing-subscription</code> design notes. Updated 2026-06-28 with the RAG vector-store
     lineage decision (pgvector → AlloyDB → AlloyDB Omni; Vertex RAG Engine dropped; per-tenant indexes +
     RAM-headroom migration trigger) captured in <code>mvp1-rag-retrieval</code> and
-    <code>mvp2-rag-vertex</code> design notes. Non-authoritative view —
+    <code>mvp2-rag-vertex</code> design notes. Updated 2026-07-07 from the scalability-proposal review:
+    circuit-breaker parameters + graceful-degradation decision (<code>mvp1-failover-baseline</code>),
+    the non-blocking persistence rule (<code>mvp1-usage-metering</code>, <code>config.yaml</code>,
+    <code>project.md</code> §3), the environments &amp; promotion pipeline (<code>mvp1-environments</code>),
+    and the session-continuity substrate seeded for MVP 2 (<code>mvp1-audio-cascaded</code>,
+    <code>mvp2-backend-failover</code> design notes). Non-authoritative view —
     <code>project.md</code> remains the source of truth.
   </footer>
 

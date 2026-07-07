@@ -5,6 +5,12 @@
   (swappable: no business logic may depend on a vendor SDK surface).
 - LLM router classifies turn complexity (target mix ~Haiku 30% / Sonnet 70%).
 - Conversation/turn state held in the session runtime; VAD-driven turn-taking and barge-in owned here.
+- **Session state is one serializable structure, not scattered process state (seed for MVP 2).**
+  Keep identity, turn history, retrieved-chunk refs, and escalation/consent progress in a single
+  serializable document — the escalation context bundle (`mvp1-crm-escalation` 1.2) already forces
+  this shape. MVP 2's session-continuity/backend-failover checkpointing then becomes
+  `serialize(state)` at turn boundaries (async, never awaited — see the non-blocking persistence
+  rule), not a runtime refactor. Ephemeral audio/STT/VAD state stays out of the document.
 
 ## Hosting & vendor placement (MVP-1 decision)
 - The cascaded runtime runs in **GCP `europe-west3` (Frankfurt)**; LiveKit agents in **`eu-central`**.
