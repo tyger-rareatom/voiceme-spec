@@ -878,6 +878,9 @@ Expand into full OpenSpec changes when reached.
 - **Latency:** end-to-end turn p50 ≤ 1.5s (target sub-1s long-term); backend resolution at session setup.
 - **Isolation:** `tenant_id` scoping enforced on every data path; provable by test.
 - **Metering:** every backend emits usage; no un-metered consumption path may ship.
+- **Non-blocking persistence:** the turn loop performs no synchronous durability writes; events
+  emit async per class (metering lossless via durable spool + admission control on new sessions;
+  telemetry sheds under pressure; consent audio fails closed). Sink outages never add turn latency.
 - **Failover:** no silent single point of failure on the live-call path.
 - **Consent & residency:** capture/storage honor consent + regional residency rules.
 - **Vendor swappability:** no business logic hard-depends on a single vendor SDK.

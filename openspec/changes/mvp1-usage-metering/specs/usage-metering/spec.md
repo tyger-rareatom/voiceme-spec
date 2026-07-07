@@ -10,6 +10,31 @@ model), and retrieval calls, available in near real time.
 - THEN a metering record captures minutes, STT/TTS seconds, tokens by model, and retrieval count
 - AND the tenant's running usage updates within minutes
 
+### Requirement: Non-blocking, lossless usage emission
+The system SHALL emit usage events from the live-call turn loop without any synchronous
+durability write: events go to a non-blocking in-process buffer backed by a locally durable
+spool, delivered to the collector at-least-once. A collector or sink outage SHALL NOT add
+latency to any turn and SHALL NOT lose usage events.
+
+#### Scenario: Collector outage adds no turn latency
+- GIVEN the metering collector is unreachable
+- WHEN calls proceed
+- THEN per-turn latency is unaffected
+- AND usage events accumulate in the local durable spool
+
+#### Scenario: No event loss across an outage
+- GIVEN usage events spooled during a collector outage
+- WHEN the collector recovers
+- THEN all spooled events are delivered and reconcile with the calls that occurred
+- AND duplicates are tolerated downstream (at-least-once, idempotent ingestion)
+
+#### Scenario: Spool pressure triggers admission policy, never turn degradation
+- GIVEN the local spool exceeds its configured threshold
+- WHEN new sessions are requested
+- THEN the configured admission policy applies (MVP-1 default: alert-only; block-new-sessions
+  available behind a flag)
+- AND in-flight calls and their turn latency are never affected
+
 ### Requirement: Cap enforcement
 The system SHALL enforce tier minute/conversation caps and flag overage.
 

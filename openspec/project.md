@@ -66,6 +66,11 @@ not forked codebases. "Swap the engine, not the car."
    only with consent, with retention and redaction controls (NDPR/POPIA).
 6. **Cost-routed inference.** Trivial turns → Haiku; substantive turns → Sonnet. Protect unit economics.
 7. **Secure & sovereign by design.** Scale/Tier-1 tenants can run in-region (VPC) with data residency.
+8. **Persistence never blocks the audio loop.** From first audio frame to hangup, the turn loop
+   performs no synchronous durability writes (the retrieval read is the only sync I/O in-loop).
+   Events emit asynchronously per class: metering is lossless (local durable spool, at-least-once;
+   sustained pressure → admission control on *new* sessions, never turn degradation); telemetry/logs
+   may shed under pressure; consent audio fails closed. A sink outage must never add turn latency.
 
 ## 4. Tech stack (pin versions in implementation)
 

@@ -25,6 +25,11 @@ context: |
   - Grounded answers only: LLM context is bounded by the tenant's retrieved documents.
   - Consent-governed audio capture (NDPR/POPIA): no consent → no training-eligible retention.
   - End-to-end turn latency p50 ≤ 1.5s; instrument every segment (STT/LLM/TTS/retrieval).
+  - Persistence never blocks the audio loop: the turn loop performs no synchronous durability
+    writes (only sync I/O in-loop is the retrieval read). Events emit async per class policy —
+    metering: lossless local spool, at-least-once (spool pressure → admission control on NEW
+    sessions, never turn degradation); telemetry/logs: shed under pressure; consent audio:
+    fail-closed (store unreachable → stop capturing).
   - Vendors are swappable: no business logic may depend on a vendor SDK surface directly.
   - Operative pricing is the enterprise card (Starter $2–5k / Growth $10–20k / Scale $30–60k);
     the discarded $99/$499 placeholder pricing must never be implemented.

@@ -12,6 +12,7 @@
 - [ ] 2.1 Seed-tenant provisioning script (AcmePay, TelcoOne: distinct docs, configs, credentials), idempotent on reset
 - [ ] 2.2 Synthetic call probe: LiveKit scripted caller + canned audio corpus + per-segment latency assertion vs SLO
 - [ ] 2.3 Tag + exclude synthetic traffic from billing aggregates while keeping it in observability (test: probe call → no billable usage, visible telemetry)
+- [ ] 2.4 Collector-outage chaos gate: kill metering collector in staging, run probe (turn latency unchanged), restore, assert spooled usage events reconcile with calls (zero loss)
 
 ## 3. Promotion pipeline
 
