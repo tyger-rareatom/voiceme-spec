@@ -6,6 +6,22 @@
 - LiveKit reconnection + documented capacity headroom; SPOF analysis recorded.
 - Leaves the failover-controller seam open for MVP 2's B→A backend failover.
 
+## Decision (2026-07-07): degrade gracefully — no second TTS vendor in MVP 1
+
+- On vendor failure the MVP-1 behaviour is **graceful degradation** (spoken failure message,
+  escalation, callback offer), **not** same-turn failover to an alternate TTS vendor.
+- **Rejected alternative — "stay speaking" multi-vendor TTS failover** (from the scalability
+  proposal review): tripping to a fallback TTS vendor keeps the agent talking through an outage,
+  but requires a second TTS contract, EU-endpoint pinning, and voice-parity work at MVP-1 traffic
+  levels. Revisit at MVP 2 alongside B→A backend failover, where an alternate backend (with its
+  own TTS) exists anyway and the breaker's "drain to alternate" hook takes over this job.
+- Consequence for the breaker: its purpose at MVP 1 is **bounding caller-perceived silence** —
+  detect fast (2 sequential timeouts or >800ms hot-path latency) and hand off to the graceful
+  path fast. Trip thresholds live in config (per dependency), not code.
+- Hot-path note: the breaker state check is an in-memory read (~0ms). The latency-budget win is
+  on the failure path — an open breaker replaces stacked vendor timeouts (multi-second) with an
+  immediate graceful turn, keeping even failure turns inside the budget.
+
 ## Payment-class errors are a distinct breaker state (not a transient outage)
 
 > A vendor cutting access for a money reason (prepaid balance exhausted, declined recharge, spend

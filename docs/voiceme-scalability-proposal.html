@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Tenant Voice Agent Architecture Specification</title>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --accent: #38bdf8;
+            --accent-hover: #7dd3fc;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --code-bg: #020617;
+            --table-header: #0f172a;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            line-height: 1.6;
+            margin: 0;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 20px;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            color: var(--accent);
+            font-size: 2.25rem;
+            margin-top: 0;
+        }
+
+        h2 {
+            color: var(--accent);
+            font-size: 1.5rem;
+            margin-top: 30px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 8px;
+        }
+
+        h3 {
+            color: var(--text-main);
+            font-size: 1.15rem;
+            margin-top: 20px;
+        }
+
+        p,
+        li {
+            color: var(--text-muted);
+        }
+
+        strong {
+            color: var(--text-main);
+        }
+
+        ul {
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        pre {
+            background-color: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            overflow-x: auto;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 0.9rem;
+            color: #e2e8f0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 0.95rem;
+        }
+
+        th,
+        td {
+            border: 1px solid var(--border);
+            padding: 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: var(--table-header);
+            color: var(--accent);
+        }
+
+        tr:nth-child(even) {
+            background-color: var(--bg-secondary);
+        }
+
+        .badge {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border);
+            color: var(--accent);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <header>
+            <h1>System Specification: Multi-Tenant Resilient Voice Agent Platform</h1>
+            <p><strong>Target Architecture:</strong> Highly concurrent, low-latency, fault-tolerant web/mobile embedded
+                voice widget backed by real-time RAG.</p>
+        </header>
+
+        <section>
+            <h2>1. System Architecture Diagram</h2>
+            <p>Review the decoupled processing layers below. All client communication transpires via persistent
+                connections managed by an edge media gateway layer.</p>
+            <pre>
+                       [ Web / Mobile Clients ]
+                                  │ (HTTPS / WebSockets / WebRTC)
+                     ┌────────────┴────────────┐
+                     │ Cloudflare Load Balancer│ (Anycast Routing, DDoS Protection)
+                     └────────────┬────────────┘
+                                  │
+                     ┌────────────┴────────────┐
+                     │   API / WebRTC Gateway  │ (LiveKit Egress / Ingress Nodes)
+                     └────────────┬────────────┘
+                                  │ (Internal Network / gRPC)
+          ┌───────────────────────┼───────────────────────┐
+          ▼                       ▼                       ▼
+┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
+│ Orchestrator Pod │    │ Orchestrator Pod │    │ Orchestrator Pod │ (Stateless FastAPI/Node.js)
+└─────────┬────────┘    └─────────┬────────┘    └─────────┬────────┘ (Replicated via Kubernetes)
+          │                       │                       │
+          └───────────────────────┼───────────────────────┘
+                                  │
+            ┌─────────────────────┴─────────────────────┐
+            ▼                                           ▼
+┌───────────────────────┐                   ┌───────────────────────┐
+│     Redis Cluster     │                   │   Apache Kafka / MQ   │
+│ (Tenant Config Cache) │                   │ (Call Analytics/Logs) │
+└─────────┬─────────────┘                   └───────────────────────┘
+          │
+┌─────────┴─────────────┐
+│  Vector DB Cluster    │
+│(Qdrant/Pinecone Pods) │
+└───────────────────────┘
+        </pre>
+        </section>
+
+        <section>
+            <h2>2. Technical Architecture & Constraints</h2>
+            <h3>Voice Pipeline Performance Markers</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Component</th>
+                        <th>Standard Approach (Incompatible)</th>
+                        <th>Voice-Optimized Implementation (Required)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Data Handling</strong></td>
+                        <td>Synchronous chunking via HTTP REST</td>
+                        <td>Real-time bi-directional streaming (<span class="badge">WebSockets</span> / <span
+                                class="badge">WebRTC</span>)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>AI Responses</strong></td>
+                        <td>Wait for full sentence generations</td>
+                        <td>Token-by-token streaming directly piped to voice generation engine</td>
+                    </tr>
+                    <tr>
+                        <td><strong>User Interruption</strong></td>
+                        <td>Wait for AI voice stream to clear</td>
+                        <td>Asynchronous barge-in detection to kill audio stream instantly</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Database Lookups</strong></td>
+                        <td>Sequential queries or single-thread locks</td>
+                        <td>Non-blocking connection pools (<span class="badge">Async Postgres</span> / <span
+                                class="badge">Redis</span>)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <section>
+            <h2>3. Fault Tolerance & Resiliency Implementation Rules</h2>
+
+            <h3>A. Stateless Execution & Session Failover</h3>
+            <ul>
+                <li><strong>Core Rule:</strong> Orchestrator pods must remain completely stateless. Do not save
+                    conversation history or state parameters within application memory.</li>
+                <li><strong>Implementation:</strong> Sync active conversation tokens, tenant parameters, and state
+                    buffers to a high-availability <span class="badge">Redis Cluster</span>. If a pod drops mid-call,
+                    the load balancer routes the stream to an alternate instance which re-hydrates the call state
+                    instantly from Redis.</li>
+            </ul>
+
+            <h3>B. Circuit Breaking for Third-Party AI Dependencies</h3>
+            <ul>
+                <li><strong>Core Rule:</strong> Third-party translation, context, and speech APIs will experience
+                    network timeouts. The system must fail over natively within milliseconds.</li>
+                <li><strong>Implementation:</strong> Enforce code-level Circuit Breakers. If the primary text-to-speech
+                    API times out twice sequentially or exceeds an <span class="badge">800ms</span> threshold, trip the
+                    circuit. Immediately drop back to fallback vendors to ensure smooth audio output.</li>
+            </ul>
+
+            <h3>C. Multi-Tenant Database Isolation</h3>
+            <ul>
+                <li><strong>Core Rule:</strong> Prevent "noisy neighbor" syndrome. A utilization spike on one embedded
+                    tenant widget must not choke resources for concurrent clients.</li>
+                <li><strong>Implementation:</strong> Implement a single vector cluster utilizing strict Metadata
+                    Filtering for tenant separation (e.g., <span class="badge">tenant_id</span> hash tags). Enforce
+                    application-level query timeouts and apply hardware or rate-limit shaping per API key token. Cache
+                    recurring FAQs inside Redis to eliminate repetitive vector disk read cycles.</li>
+            </ul>
+
+            <h3>D. Asynchronous Event Offloading</h3>
+            <ul>
+                <li><strong>Core Rule:</strong> Database writing bottlenecks in logging, analytics, and billing
+                    pipelines must never block the low-latency audio engine loop.</li>
+                <li><strong>Implementation:</strong> The orchestrator must execute purely non-blocking fire-and-forget
+                    events to a message broker layer (<span class="badge">Kafka</span> / <span
+                        class="badge">RabbitMQ</span>). Isolated downstream consumer services will digest the message
+                    queues sequentially to execute record management, log parsing, and utility processing.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>4. Reference Go Implementation: Low-Latency Circuit Breaker</h2>
+            <p>The following concurrent Go code serves as a reference for the coding agent. It implements an
+                asynchronous text-to-speech fallback engine using channels and strict timeout handling to isolate
+                downstream API failures from the real-time audio pipeline.</p>
+
+            <pre>
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sync/atomic"
+	"time"
+)
+
+// TTSEngine defines the contract for real-time speech generation streaming.
+type TTSEngine interface {
+	GenerateAudioStream(ctx context.Context, textTokens &lt;-chan string) (&lt;-chan []byte, &lt;-chan error)
+}
+
+
+// CircuitBreakerTTS acts as a resilient proxy wrapper over primary and fallback engines.
+type CircuitBreakerTTS struct {
+Primary TTSEngine
+Fallback TTSEngine
+FailureCount int64
+MaxFailures int64
+TimeoutPeriod time.Duration
+}
+// GenerateAudioStream processes text tokens concurrently and switches engines automatically if defaults fail.
+func (cb *CircuitBreakerTTS) GenerateAudioStream(ctx context.Context, textTokens <-chan string) (<-chan []byte, <-chan error) {
+outAudio := make(chan []byte, 100)
+outErr := make(chan error, 1)
+go func() {
+defer close(outAudio)
+defer close(outErr)
+// Check if the circuit breaker is tripped
+useFallback := atomic.LoadInt64(&cb.FailureCount) >= cb.MaxFailures
+var activeEngine TTSEngine = cb.Primary
+if useFallback {
+activeEngine = cb.Fallback
+}
+// Create a localized cancel context to manage processing windows
+engineCtx, cancel := context.WithTimeout(ctx, cb.TimeoutPeriod)
+defer cancel()
+audioChan, errChan := activeEngine.GenerateAudioStream(engineCtx, textTokens)
+for {
+select {
+case <-ctx.Done():
+outErr <- ctx.Err()
+return
+case err, ok := <-errChan:
+if ok && err != nil {
+if !useFallback {
+// Increment failure tally atomically to protect across simultaneous concurrent worker threads
+atomic.AddInt64(&cb.FailureCount, 1)
+// Trigger immediate panic recovery fallback inline
+fallbackAudio, fallbackErr := cb.Fallback.GenerateAudioStream(ctx, textTokens)
+for audio := range fallbackAudio {
+outAudio <- audio
+}
+if err := <-fallbackErr; err != nil {
+outErr <- fmt.Errorf("both primary and fallback engines failed: %w", err)
+}
+return
+}
+outErr <- err
+return
+}
+case audio, ok := <-audioChan:
+if !ok {
+// Success completion: reset failure count if running on primary
+if !useFallback {
+atomic.StoreInt64(&cb.FailureCount, 0)
+}
+return
+}
+outAudio <- audio
+}
+}
+}()
+return outAudio, outErr
+}
+
+
+
+<FollowUp>
+This complete layout file is ready to be exported directly to your development tool environment. Would you like to map out the **frontend JavaScript client code** that runs inside the embeddable browser widget to connect to this architecture, or should we move on to **how to handle real-time user voice interruptions**?
