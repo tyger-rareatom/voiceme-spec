@@ -107,10 +107,11 @@ not forked codebases. "Swap the engine, not the car."
 
 ## 6. Phase map (build order)
 
-- **MVP 1 — Standard platform GA** (Months 1–5): multi-tenant platform, cascaded audio, RAG + continuous ingestion, widget, billing, **metering**, **basic failover**, escalation + CRM, consent capture, channel-ingress abstraction.
-- **MVP 2 — Premium / Scale tier + sovereign** (Months 5–9): Gemini Live backend + B→A fallback, Vertex RAG + tier-upgrade migration, sovereign deployment, isolation hardening, trial-gating.
+- **MVP 1 — Standard platform GA** (Months 1–5): multi-tenant platform, cascaded audio, RAG + continuous ingestion, widget, billing, **metering**, **basic failover**, escalation + CRM, consent capture, channel-ingress abstraction, **caller verification + session abuse controls** (`mvp1-caller-verification`).
+- **MVP 2 — Premium / Scale tier + sovereign** (Months 5–9): Gemini Live backend + B→A fallback, Vertex RAG + tier-upgrade migration, sovereign deployment, isolation hardening, trial-gating, **read-only action packs** (`mvp2-action-packs`), **compliance evidence** (`mvp2-compliance-evidence`).
+- **Market-leadership capabilities:** caller verification (trust) → action packs (value) → compliance evidence (safety). These are the differentiators against horizontal voice-agent platforms; African-language speech is bought from specialist providers behind the STT/TTS interfaces where they outperform, and built in-house (MVP 3) only where a tenant needs fully in-country inference.
 - **MVP 3 — Africa language moat** (Year 1–2): NVIDIA self-host backend, Pidgin & Swahili language packs, GPU ops, Nemotron LLM slot + tool-calling spike gate.
-- **Phase 4 — Agentic actions & intelligence** (Year 2): function-calling actions, conversation intelligence, outbound campaigns (compliance-gated), context-rich live-agent handoff.
+- **Phase 4 — Agentic actions & intelligence** (Year 2): write actions extending `action-packs`, conversation intelligence, outbound campaigns (compliance-gated), context-rich live-agent handoff.
 - **Phase 5 — Scale & expansion** (Year 2+): self-hosted-LLM volume migration, vertical knowledge templates, compliance certifications as product, integration marketplace, multi-region, developer platform.
 
 ## 7. Commercial guardrails (constrain technical choices)
@@ -129,6 +130,13 @@ not forked codebases. "Swap the engine, not the car."
 - Language packs require **labelled Pidgin/Swahili audio data** (the true critical path), not just model access.
 - Nemotron tool-calling reliability is **spike-gated** before any sovereign agentic-actions commitment.
 - Single-engineer dependency risk on the platform/GPU role — staff a backup.
+- **Operator network-API coverage is uneven:** Number Verification and SIM Swap availability, price per
+  call, and end-user consent rules vary by country and operator — confirm per operator before promising
+  L2/L3 verification to a tenant (`mvp1-caller-verification`).
+- **Tenant-system integration speed** sets the pace of `mvp2-action-packs`; banks expose core systems
+  through their own gateways, so the first pack ships with a design partner.
+- **Jurisdiction-profile contents are legal advice** — counsel must approve each profile version before
+  activation (`mvp2-compliance-evidence`).
 - **MVP-1 hosting validation (open spikes):** (1) Deepgram **Nigerian-accented-English WER** on real support
   audio — the launch *language* gate; (2) **Joburg→Frankfurt live latency** probe — the weakest media leg
   (~150-180ms); (3) Vertex **single-region `europe-west3`** embedding availability — only blocking if a tenant
