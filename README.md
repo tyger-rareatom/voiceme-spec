@@ -38,14 +38,17 @@ This package drives VoiceMe's architecture, planning, and development through
 ## Build order (do not reorder without reading Appendix B)
 
 ```
-MVP 1  → Standard platform GA          (15 packages — fully scaffolded, build now)
-MVP 2  → Premium / Scale + sovereign   (6 packages — scaffolded, BLOCKED-BY headers gate start)
+MVP 1  → Standard platform GA          (18 packages — fully scaffolded, build now)
+MVP 2  → Premium / Scale + sovereign   (8 packages — scaffolded, BLOCKED-BY headers gate start)
 MVP 3  → Africa language moat (NVIDIA)  (5 packages — scaffolded, BLOCKED-BY headers gate start)
 Phase 4 → Agentic actions & intelligence (stub in master spec — expand at the time)
 Phase 5 → Scale & expansion             (stub in master spec — expand at the time)
 ```
 
-All 26 change packages live under `openspec/changes/`. **Every MVP 2/3 proposal carries a
+**Market-leadership capabilities** (trust → value → safety): `mvp1-caller-verification`,
+`mvp2-action-packs`, `mvp2-compliance-evidence`. See the MVP 2 section of the phased spec for why.
+
+All 31 change packages live under `openspec/changes/`. **Every MVP 2/3 proposal carries a
 `Status / Blocked-by` header** naming the prerequisite changes that must be archived first —
 AI assistants must honor these (enforced in AGENTS.md).
 
@@ -57,6 +60,10 @@ AI assistants must honor these (enforced in AGENTS.md).
 - `mvp2-backend-failover` requires a second backend to exist (follows `mvp2-audio-gemini`).
 - Scale-tier pricing commitments require `mvp2-scale-trial-gating` to have run.
 - `mvp2-rag-vertex` task 1.1 (region availability check) is a hard gate — do it first.
+- `mvp1-caller-verification` must exist before `mvp2-action-packs`; `mvp2-action-packs` precedes Phase 4
+  write actions.
+- `mvp2-compliance-evidence` needs `consent-capture` + `usage-metering`; its sovereign parts follow
+  `mvp2-sovereign-deployment`.
 
 ## Why MVP 1 is bigger than it looks
 

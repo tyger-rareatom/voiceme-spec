@@ -51,6 +51,8 @@ observable — with backend selection abstracted so MVP 2/3 backends slot in wit
 13. Tenant config store (control plane for flags)
 14. Consent capture & data-governance pipeline
 15. Failover & resilience (baseline)
+16. Caller verification & session abuse controls (signed tenant token, assurance levels, operator
+    network-API checks) — **market-leadership capability 1 of 3**
 
 ---
 
@@ -726,6 +728,48 @@ reconnection, capacity headroom).
 ```
 
 ---
+
+## Change: `mvp1-caller-verification`
+**Capability:** `caller-verification` · **Phase:** MVP 1 · **Market-leadership capability 1 of 3**
+
+### proposal.md
+- **Why:** A session is created from a public `data-tenant` slug alone, so the agent cannot know who is
+  speaking (no account answers are possible) and anyone can run up a tenant's minutes. Spoken PINs are
+  unsafe and SIM-swap fraud is a leading takeover route in African mobile money and banking. Operator
+  network APIs (GSMA Open Gateway / CAMARA: Number Verification, SIM Swap) plus a signed tenant token
+  give a verified caller without secrets — something global platforms do not integrate country by country.
+- **What changes:** Signed session bootstrap (tenant-signed JWT, ≤ 5 min, single use); caller assurance
+  levels L0–L3; `network_identity_provider` interface with OTP fallback; abuse controls (origin
+  allowlist, rate limits, daily spend cap).
+- **User-visible impact:** Silent verification in the tenant's app; callers with a recent SIM change are
+  offered a human instead of account data.
+- **Rollback:** Per-tenant `caller_verification` flag, default off (L0); abuse controls stay on.
+
+### specs/caller-verification/spec.md (key requirements)
+- *Signed session bootstrap* — tokens from another tenant, expired, or replayed are rejected; no session
+  or metering record is created (cross-tenant negative case).
+- *Caller assurance levels* — L0 anonymous · L1 tenant-asserted · L2 network-verified (Number
+  Verification or OTP) · L3 no SIM change within the tenant window.
+- *Network identity checks behind a provider interface* — operator without APIs falls back; provider
+  timeout never stalls a turn.
+- *Verification is metered* — an adapter without the usage callback fails conformance.
+- *Session abuse controls* — unlisted origin rejected before media allocation; spend cap never cuts
+  live calls.
+- *Identity data minimisation* — no full phone number in logs, traces, or transcripts.
+
+### design.md
+- Bootstrap stages before media: allowlist → rate limit → spend cap → token verify → mint LiveKit token.
+- Network checks start after connect, parallel to the greeting, off the turn path; tools needing L2/L3
+  wait up to the provider timeout behind a holding phrase.
+- Channel limits: Number Verification needs mobile data (Wi-Fi → OTP); phone caller ID can be spoofed
+  (never above L1 alone); WhatsApp is L1 with OTP step-up.
+- Full package: `openspec/changes/mvp1-caller-verification/`.
+
+### tasks.md
+See `openspec/changes/mvp1-caller-verification/tasks.md` (abuse controls · signed bootstrap ·
+assurance levels · provider interface + first operator adapter + OTP · privacy · tests).
+
+---
 ---
 
 # MVP 2 — Premium / Scale tier + sovereign
@@ -742,6 +786,57 @@ interfaces built in MVP 1, with real failover and tier-upgrade migration.
 6. Scale-tier trial gating (real-traffic trial before pricing commitment)
 7. Session continuity (turn-boundary state checkpoints; resume-with-context on reconnect — the
    substrate B→A failover hydrates from, so it precedes `mvp2-backend-failover`)
+8. Action packs — read-only account resolution (pulled forward from Phase 4 `agentic-actions`) —
+   **market-leadership capability 2 of 3**
+9. Compliance evidence — per-country jurisdiction profiles, answer provenance, transfer register,
+   evidence reports — **market-leadership capability 3 of 3**
+
+### Market-leadership capabilities (why these three)
+Knowledge-base voice widgets and African-language speech are crowded markets; neither makes VoiceMe a
+leader on its own. The three capabilities below are hard for horizontal platforms to copy because they
+depend on African operator APIs, tenant-system integrations, and per-country regulatory profiles. Each
+depends on the one before it:
+
+| Layer | Capability | Buyer proof |
+|---|---|---|
+| Trust | `mvp1-caller-verification` | The agent knows who it is talking to |
+| Value | `mvp2-action-packs` | The agent resolves the call; resolutions are measured |
+| Safety | `mvp2-compliance-evidence` | The regulator will accept the evidence |
+
+### Change: `mvp2-action-packs` (capability `action-packs`)
+- **proposal:** Resolve account-specific calls in the call. Per-tenant tool registry, versioned pack
+  manifests, server-side action policy, `action_connector` interface to tenant systems (via the tenant's
+  API gateway or middleware), and five **read-only** packs: transfer status, card status, airtime/data
+  status, loan balance, KYC status (each may open a dispute ticket via the CRM connector). Emits
+  tool-call and **resolution** events to metering so per-resolution pricing can be evaluated (no pricing
+  change here). **Blocked by:** `mvp1-caller-verification`, `mvp1-audio-cascaded`,
+  `mvp1-tenant-config-store`, `mvp1-usage-metering`, `mvp1-crm-escalation`. **Rollback:** per-pack flag.
+- **Key requirements (GWT):**
+  - *Requirement: Tenant-scoped tool registry* — GIVEN TelcoOne has no transfer-status pack, WHEN its session starts, THEN no AcmePay tool, binding, or credential is reachable.
+  - *Requirement: Server-side action policy* — GIVEN a verified caller bound to account A, WHEN the model proposes a lookup on account B, THEN the policy rejects it.
+  - *Requirement: Read-only scope in MVP 2* — GIVEN a manifest declaring a write, WHEN registered, THEN validation fails.
+  - *Requirement: Graceful failure of tenant systems* — GIVEN a connector timeout, WHEN the caller waits, THEN the agent offers a callback or human and invents no status.
+- **design:** model proposes → policy → connector → redaction → grounded answer. Tool turns exceed the
+  1.5 s budget by the connector latency plus one LLM pass; holding phrase on accept. Sovereign tenants
+  keep packs off until the managed LLM is in their control mapping or `mvp3-nemotron-spike` passes.
+- **tasks:** [ ] manifest + validator · [ ] registry · [ ] action policy + subject binding · [ ] connector interface + tenant REST connector + first rail connector · [ ] five packs · [ ] redaction · [ ] tool + resolution metering · [ ] isolation, injection, timeout tests.
+
+### Change: `mvp2-compliance-evidence` (capability `compliance-evidence`)
+- **proposal:** Turn compliance into a product feature. Versioned per-country jurisdiction profiles (NG,
+  ZA, KE first; contents counsel-owned), answer provenance per turn, a cross-border transfer register
+  derived from metering, a tenant-scoped append-only evidence store, CSV/PDF evidence reports, and a
+  data-subject request workflow. Extends the one-off control mapping in `mvp2-sovereign-deployment`.
+  **Blocked by:** `mvp1-consent-capture`, `mvp1-usage-metering`, `mvp1-observability`,
+  `mvp1-rag-retrieval`; sovereign parts by `mvp2-sovereign-deployment`. **Rollback:** additive; per-tenant flags.
+- **Key requirements (GWT):**
+  - *Requirement: Jurisdiction profiles* — GIVEN a tenant on the Nigeria profile, WHEN a call starts, THEN the profile's disclosure is spoken and its version recorded; unapproved versions cannot be activated.
+  - *Requirement: Answer provenance* — GIVEN a transcript turn, WHEN opened, THEN its source document versions are shown; no record crosses tenants.
+  - *Requirement: Cross-border transfer register* — GIVEN EU transcription for a Nigeria-profile tenant, WHEN the register is generated, THEN the entry is flagged as a cross-border transfer.
+  - *Requirement: Append-only evidence store* — GIVEN an existing consent record, WHEN modification is attempted, THEN it is rejected and recorded.
+- **design:** profiles as schema-validated data; `document_version` added to chunks; mandatory
+  `processing_region` on usage events; provenance via the async event path (no turn-latency impact after
+  the first turn's disclosure).
+- **tasks:** [ ] profile schema + store · [ ] NG/ZA/KE drafts for counsel · [ ] provenance · [ ] `processing_region` + register · [ ] append-only store · [ ] reports + export · [ ] data-subject requests · [ ] isolation + append-only tests.
 
 ### Change: `mvp2-audio-gemini` (capability `audio-gemini`)
 - **proposal:** Add Gemini Live native audio behind the audio interface for covered-language, latency-
@@ -846,9 +941,12 @@ Swahili) packs — and stand up the GPU operations and the spike-gated Nemotron 
 Expand into full OpenSpec changes when reached.
 
 **Deliverables (propose later):**
-1. **Agentic tool use** (`agentic-actions`) — function calling for order status, password reset,
-   refund, booking. Managed tiers on Claude; sovereign on Nemotron **only if the MVP 3 spike passed**.
-   Requirements must include confirmation steps, audit trails, and scope limits per action.
+1. **Agentic tool use** (`agentic-actions`) — **write** actions (card block, reversal execution,
+   refund, password reset, booking) as a `MODIFIED` delta on the `action-packs` capability from
+   `mvp2-action-packs` (read-only packs, registry, policy, and connectors already exist). Managed tiers
+   on Claude; sovereign on Nemotron **only if the MVP 3 spike passed**. Requirements must include spoken
+   confirmation, an assurance level of at least L3 for money-moving writes, audit trails via
+   `compliance-evidence`, and scope limits per action.
 2. **Conversation intelligence** (`conversation-intelligence`) — analytics dashboard, sentiment-aware
    escalation, topic clustering, weekly trend reports. (Completes the sentiment placeholder from MVP 1.)
 3. **Outbound campaigns** (`outbound-voice`) — proactive calls (reminders, confirmations, retention).
@@ -896,3 +994,10 @@ Expand into full OpenSpec changes when reached.
 - `mvp3-nemotron-spike` is a **gate** for Phase 4 sovereign `agentic-actions`.
 - `mvp2-backend-failover` requires a second backend to exist (so it follows `mvp2-audio-gemini`).
 - Scale-tier pricing commitments require `mvp2-scale-trial-gating` to have run.
+- `mvp1-caller-verification` is a **prerequisite** for `mvp2-action-packs`: no account tool runs without
+  a verified caller.
+- `mvp2-action-packs` is a **prerequisite** for Phase 4 `agentic-actions` (writes extend its registry,
+  policy, and connectors).
+- `mvp2-compliance-evidence` requires `mvp1-consent-capture` + `mvp1-usage-metering`; its sovereign
+  parts follow `mvp2-sovereign-deployment`.
+- Per-resolution pricing requires `mvp2-action-packs` resolution data and a `project.md` §7 update first.
