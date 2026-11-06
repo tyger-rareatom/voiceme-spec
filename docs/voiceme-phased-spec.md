@@ -53,6 +53,10 @@ observable — with backend selection abstracted so MVP 2/3 backends slot in wit
 15. Failover & resilience (baseline)
 16. Caller verification & session abuse controls (signed tenant token, assurance levels, operator
     network-API checks) — **market-leadership capability 1 of 3**
+17. Workflow engine (transactional outbox, durable timers, metered email/SMS notification adapters) —
+    platform for the three workflow automations
+18. Knowledge-gap loop (unanswered question → admin email → approved KB answer → caller follow-up) —
+    **workflow automation 1 of 3**
 
 ---
 
@@ -770,6 +774,66 @@ See `openspec/changes/mvp1-caller-verification/tasks.md` (abuse controls · sign
 assurance levels · provider interface + first operator adapter + OTP · privacy · tests).
 
 ---
+
+## Workflow automations (why)
+Every call ends answered, escalated, or with "I don't have that information". The last two are dead
+ends: callbacks are offered (`mvp1-failover-baseline`, `mvp2-action-packs`) but no capability owns
+them, and retrieval with no content stops at "I don't have that". Three workflow templates on one
+engine turn each dead end into a tracked outcome:
+
+| # | Workflow | Change | Phase | Dead end it closes |
+|---|---|---|---|---|
+| — | Engine | `mvp1-workflow-engine` | MVP 1 | Platform: outbox, durable timers, metered notifications |
+| 1 | Knowledge-gap loop | `mvp1-knowledge-gap-loop` | MVP 1 | "I don't have that information" |
+| 2 | Follow-through | `mvp2-follow-through` | MVP 2 | Callback and status promises nobody fulfils |
+| 3 | Complaint cases | `mvp2-complaint-cases` | MVP 2 | Complaints logged by hand, deadlines missed |
+
+## Change: `mvp1-workflow-engine`
+**Capability:** `workflow-engine` · **Phase:** MVP 1
+
+### proposal.md
+- **Why:** The three workflows share one shape (an event from a call starts a process with timers,
+  notifications, and escalations that runs for hours or days). Build it once.
+- **What changes:** Transactional outbox from the session runtime → NATS JetStream → a Go workflow
+  service with versioned templates, tenant parameters, durable timers, retries, and idempotent actions;
+  `notification_channel` interface (email send + reply ingestion, SMS); per-message metering and a
+  monthly cap; overdue alerts.
+- **User-visible impact:** Internal; surfaces through the workflow templates.
+- **Rollback:** Templates are per-tenant flags; outbox rows persist until consumed.
+
+### specs/workflow-engine/spec.md (key requirements)
+- *Lossless, non-blocking workflow events* — service outage never adds turn latency; duplicate delivery
+  creates one instance.
+- *Tenant-configured workflow templates* — parameters per tenant, logic fixed; no cross-tenant access.
+- *Durable timers and retries* — a restart neither loses nor double-fires a timer.
+- *Idempotent notification actions* — a retried send reaches the caller once.
+- *Notification adapters are wrapped and metered* — un-metered adapter fails conformance; cap policy applies.
+- *Overdue visibility* — alerts and per-tenant open/overdue/completed counts.
+
+### design.md
+- Postgres state + JetStream chosen over Temporal for MVP 1–2 (fits the stack, no new cluster);
+  revisit Temporal for tenant-authored workflows (Phase 5).
+- No turn-path change: events are written at turn end via the async spool.
+- Full package: `openspec/changes/mvp1-workflow-engine/`.
+
+## Change: `mvp1-knowledge-gap-loop`
+**Capability:** `knowledge-gap-loop` · **Phase:** MVP 1 · **Workflow automation 1 of 3**
+
+### proposal.md
+- **Why:** An unanswered question leaves the caller without an answer and the tenant without the
+  knowledge it needs; the same gap costs another call tomorrow.
+- **What changes:** Gap detection → open enquiry with caller consent and channel → grouping of similar
+  questions → admin email (urgent + digest) → answer by email reply (signed token, registered sender) →
+  approval with conflict check → published as a KB entry within one hour → answer sent to waiting
+  callers; expiry with apology; account-specific questions go to escalation.
+- **Rollback:** Per-tenant `knowledge_gap_loop` flag, default off.
+
+### specs/knowledge-gap-loop/spec.md (key requirements)
+- *Knowledge-gap detection* · *Caller follow-up consent* · *Grouping of similar enquiries* ·
+  *Admin notification and email reply* · *Approval before publishing* · *Enquiry expiry* ·
+  *Knowledge-gap metrics*. Full package: `openspec/changes/mvp1-knowledge-gap-loop/`.
+
+---
 ---
 
 # MVP 2 — Premium / Scale tier + sovereign
@@ -790,6 +854,10 @@ interfaces built in MVP 1, with real failover and tier-upgrade migration.
    **market-leadership capability 2 of 3**
 9. Compliance evidence — per-country jurisdiction profiles, answer provenance, transfer register,
    evidence reports — **market-leadership capability 3 of 3**
+10. Follow-through — every callback or status promise tracked to completion; WhatsApp notifications —
+    **workflow automation 2 of 3**
+11. Complaint cases — confirmed intake, reference number, deadline clock from the jurisdiction profile,
+    escalation, evidence — **workflow automation 3 of 3**
 
 ### Market-leadership capabilities (why these three)
 Knowledge-base voice widgets and African-language speech are crowded markets; neither makes VoiceMe a
@@ -837,6 +905,38 @@ depends on the one before it:
   `processing_region` on usage events; provenance via the async event path (no turn-latency impact after
   the first turn's disclosure).
 - **tasks:** [ ] profile schema + store · [ ] NG/ZA/KE drafts for counsel · [ ] provenance · [ ] `processing_region` + register · [ ] append-only store · [ ] reports + export · [ ] data-subject requests · [ ] isolation + append-only tests.
+
+### Change: `mvp2-follow-through` (capability `follow-through`) — workflow automation 2 of 3
+- **proposal:** Every promise the agent makes (callback, status notice, after-hours follow-up) becomes a
+  tracked commitment: scheduled within tenant hours, caller preference, and jurisdiction contact rules;
+  fulfilled by a human callback with context or a status watch; escalated before it goes overdue;
+  closed if the caller calls back first; reported as promises kept %. Adds a WhatsApp notification
+  adapter. **Blocked by:** `mvp1-workflow-engine`, `mvp1-crm-escalation`, `mvp1-caller-verification`,
+  `mvp1-agent-configuration`; status watches by `mvp2-action-packs`; contact rules by
+  `mvp2-compliance-evidence`. **Rollback:** per-tenant flag.
+- **Key requirements (GWT):**
+  - *Requirement: Every promise becomes a commitment* — GIVEN the caller accepts a failover callback, WHEN the call ends, THEN a commitment with a due time exists; a declined offer creates nothing.
+  - *Requirement: Human callback with context* — GIVEN a due callback, WHEN it is about to be made, THEN the caller gets a message naming the tenant and calling number; account data needs re-verification.
+  - *Requirement: Status watch notifications* — GIVEN a watched reversal, WHEN it completes, THEN the caller is told once.
+  - *Requirement: Duplicate-safe closure* — GIVEN an open callback, WHEN the caller calls first and the matter is resolved, THEN the callback is cancelled.
+- **design:** shared `offer_follow_up()` so every offer path emits `commitment.created`; open-commitment
+  lookup at session setup (one indexed read, no per-turn cost). Automated outbound voice callbacks stay
+  in Phase 4 `outbound-voice`.
+
+### Change: `mvp2-complaint-cases` (capability `complaint-cases`) — workflow automation 3 of 3
+- **proposal:** Detect complaint intent, confirm with the caller, open a case with a reference number
+  read out on the call, classify it, start a deadline clock from the jurisdiction profile, remind and
+  escalate before breach, acknowledge and close in writing, merge duplicates, send fraud reports and
+  vulnerable callers straight to a human, and record every event as compliance evidence.
+  **Blocked by:** `mvp1-workflow-engine`, `mvp1-crm-escalation`, `mvp2-compliance-evidence`.
+  **Rollback:** per-tenant flag.
+- **Key requirements (GWT):**
+  - *Requirement: Confirmed complaint intake* — GIVEN a frustrated caller, WHEN they decline a formal complaint, THEN no case opens.
+  - *Requirement: Deadline clock and escalation* — GIVEN a case near its deadline, WHEN inside the lead time, THEN the escalation contact is alerted; a missed deadline is recorded as a breach.
+  - *Requirement: Duplicate merging* — GIVEN an open case, WHEN the same caller complains about the same matter, THEN the call joins that case.
+  - *Requirement: Priority routing for fraud and vulnerable callers* — GIVEN a fraud report, WHEN confirmed, THEN a human takes the call immediately.
+- **design:** intent from the existing turn output (no extra model call); profile version stored on the
+  case so deadlines never move; VoiceMe holds the clock of record, the CRM holds the ticket.
 
 ### Change: `mvp2-audio-gemini` (capability `audio-gemini`)
 - **proposal:** Add Gemini Live native audio behind the audio interface for covered-language, latency-
@@ -951,6 +1051,8 @@ Expand into full OpenSpec changes when reached.
    escalation, topic clustering, weekly trend reports. (Completes the sentiment placeholder from MVP 1.)
 3. **Outbound campaigns** (`outbound-voice`) — proactive calls (reminders, confirmations, retention).
    **Compliance-gated**: opt-in/opt-out, do-not-call, time-of-day, POPIA/Kenya DPA. Not before consent + controls.
+   Implemented as an outbound-voice adapter on `mvp1-workflow-engine`; first use is automated callbacks
+   for `mvp2-follow-through` commitments.
 4. **Context-rich live-agent handoff** (`agent-handoff`) — full transcript + state + sentiment to the human.
 
 ---
@@ -1001,3 +1103,7 @@ Expand into full OpenSpec changes when reached.
 - `mvp2-compliance-evidence` requires `mvp1-consent-capture` + `mvp1-usage-metering`; its sovereign
   parts follow `mvp2-sovereign-deployment`.
 - Per-resolution pricing requires `mvp2-action-packs` resolution data and a `project.md` §7 update first.
+- `mvp1-workflow-engine` precedes `mvp1-knowledge-gap-loop`, `mvp2-follow-through`,
+  `mvp2-complaint-cases`, and Phase 4 `outbound-voice`.
+- `mvp2-complaint-cases` requires `mvp2-compliance-evidence` (jurisdiction deadlines, evidence store);
+  `mvp2-follow-through` status watches require `mvp2-action-packs`.
