@@ -1,10 +1,12 @@
 # Design: mvp1-billing-subscription
 
 ## Approach
-- Stripe subscriptions + metered usage records pushed from the metering plane.
-- Entitlements map to tier; enforcement middleware in the control plane.
-- Pricing = enterprise card from project.md (Starter $2–5k / Growth $10–20k / Scale $30–60k).
-  The discarded $99/$499 placeholder pricing MUST NOT be implemented.
+- Subscriptions + metered usage records pushed from the metering plane, through `billing_provider`.
+- Entitlements map to plan; enforcement middleware in the control plane.
+- Pricing = the structure in `project.md` §7 (platform fee by plan + per-resolution fee + modules +
+  pilot), with prices read from the versioned catalogue in `mvp1-outcome-billing`. No price is
+  hardcoded. The superseded minute-tier card (Starter $2–5k / Growth $10–20k / Scale $30–60k) and the
+  discarded $99/$499 placeholder MUST NOT be implemented.
 
 ## Open gap: Stripe cannot collect from African tenants (payment-provider interface needed)
 

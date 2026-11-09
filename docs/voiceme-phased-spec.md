@@ -57,6 +57,8 @@ observable — with backend selection abstracted so MVP 2/3 backends slot in wit
     platform for the three workflow automations
 18. Knowledge-gap loop (unanswered question → admin email → approved KB answer → caller follow-up) —
     **workflow automation 1 of 3**
+19. Outcome billing (versioned pricing catalogue, resolved-conversation definition with a repeat-contact
+    window, resolution events, disputes, pilot settlement, FX) — replaces the minute-tier card
 
 ---
 
@@ -563,7 +565,8 @@ The system SHALL bill overage beyond tier caps using metering data.
 
 ### design.md
 - Stripe subscriptions + metered usage records pushed from the metering plane. Entitlements map to
-  tier. Pricing = enterprise card from `project.md` (placeholder $99/$499 explicitly excluded).
+  plan. Pricing = the structure in `project.md` §7, prices read from the versioned catalogue in
+  `mvp1-outcome-billing`. The superseded minute-tier card and the $99/$499 placeholder are excluded.
 
 ### tasks.md
 ```
@@ -832,6 +835,27 @@ engine turn each dead end into a tracked outcome:
 - *Knowledge-gap detection* · *Caller follow-up consent* · *Grouping of similar enquiries* ·
   *Admin notification and email reply* · *Approval before publishing* · *Enquiry expiry* ·
   *Knowledge-gap metrics*. Full package: `openspec/changes/mvp1-knowledge-gap-loop/`.
+
+## Change: `mvp1-outcome-billing`
+**Capability:** `outcome-billing` · **Phase:** MVP 1
+
+### proposal.md
+- **Why:** The minute-tier card priced a 3-minute Growth call at $3.00–4.50 against an estimated
+  $0.23–0.57 for a human contact in Nigeria. Buyers pay for compliance, verified answers and resolved
+  calls, not minutes.
+- **What changes:** Versioned pricing catalogue (prices as data, contracts pin a version); a
+  resolved-conversation definition with a 72-hour repeat-contact window; final, idempotent resolution
+  events; tenant-visible audit and disputes; pilot settlement with automatic credit notes; USD list
+  prices with quarterly FX locks; a margin guardrail.
+- **Rollback:** Per-tenant `billing_model` flag (`outcome` | `legacy_minutes`).
+
+### specs/outcome-billing/spec.md (key requirements)
+- *Versioned pricing catalogue* · *Resolved conversation definition* · *Repeat-contact window* ·
+  *Resolution events* · *Resolution audit and disputes* · *Fair-use minutes and overage* ·
+  *Pilot billing with containment guarantee* · *Currency and FX* · *Margin guardrail*.
+- Catalogue v1: Standard $1,000/mo · Regulated $3,500/mo · action-pack module $1,500/mo · $0.45 per
+  resolution · pilot with no platform fee, $1,500 monthly minimum. Full package:
+  `openspec/changes/mvp1-outcome-billing/`.
 
 ---
 ---
@@ -1102,7 +1126,10 @@ Expand into full OpenSpec changes when reached.
   policy, and connectors).
 - `mvp2-compliance-evidence` requires `mvp1-consent-capture` + `mvp1-usage-metering`; its sovereign
   parts follow `mvp2-sovereign-deployment`.
-- Per-resolution pricing requires `mvp2-action-packs` resolution data and a `project.md` §7 update first.
+- Per-resolution pricing is defined by `mvp1-outcome-billing` (resolution definition, catalogue) and
+  updated in `project.md` §7; `mvp2-action-packs` resolution criteria feed the same resolution events.
+- `mvp1-outcome-billing` requires `mvp1-usage-metering` + `mvp1-billing-subscription`; repeat-contact
+  matching uses `mvp1-caller-verification`; resolution windows run on `mvp1-workflow-engine`.
 - `mvp1-workflow-engine` precedes `mvp1-knowledge-gap-loop`, `mvp2-follow-through`,
   `mvp2-complaint-cases`, and Phase 4 `outbound-voice`.
 - `mvp2-complaint-cases` requires `mvp2-compliance-evidence` (jurisdiction deadlines, evidence store);

@@ -40,8 +40,9 @@ under `openspec/changes/<change-id>/`.
    to the graceful-degradation/escalation path. No dead air, no hangs.
 7. **Consent before capture.** Training-eligible audio is only retained where consent is recorded;
    respect retention + redaction. This is law (NDPR/POPIA), not preference.
-8. **Pricing guardrail.** Implement only the enterprise pricing card from `project.md`. If you find
-   $99/$499 anywhere, that's a bug — flag it.
+8. **Pricing guardrail.** Implement only the pricing structure in `project.md` §7, with prices read from
+   the versioned catalogue (`mvp1-outcome-billing`); never hardcode a price. The superseded minute-tier
+   card and the $99/$499 placeholder are bugs if found — flag them.
 
 ## Conventions
 
