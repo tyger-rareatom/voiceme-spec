@@ -117,8 +117,20 @@ not forked codebases. "Swap the engine, not the car."
 
 ## 7. Commercial guardrails (constrain technical choices)
 
-- Operative pricing card is the **enterprise** tier set ($2–5k Starter / $10–20k Growth / $30–60k Scale),
-  which is margin-positive. The $99/$499 placeholder pricing is **discarded** (margin-negative).
+- **Pricing structure (operative, `mvp1-outcome-billing`):** a **platform fee** by plan (Standard /
+  Regulated / Sovereign) that carries most of the margin; a **per-resolution fee** (the value metric),
+  priced between 2x VoiceMe's cost per resolved call and the buyer's cost per human contact; **modules**
+  (action packs, phone and WhatsApp channels, operator caller checks, specialist languages) with
+  third-party costs passed through; and a **design-partner pilot** with no platform fee and a
+  containment guarantee. Minutes are a fair-use guardrail, not the price.
+- **Prices are data:** held in a versioned pricing catalogue; contracts pin a version; nothing is
+  hardcoded. Catalogue version 1: Standard $1,000/mo, Regulated $3,500/mo, action-pack module
+  $1,500/mo, $0.45 per resolution (see `mvp1-outcome-billing` design).
+- **Why the old card was superseded:** the minute-tier card (Starter $2–5k / Growth $10–20k / Scale
+  $30–60k) priced a 3-minute Growth call at $3.00–4.50, against an estimated $0.23–0.57 for a human
+  contact in Nigeria. It MUST NOT be implemented. The $99/$499 placeholder remains **discarded**.
+- **Unit economics at catalogue v1:** break-even at 18 paying tenants (12 with the action-pack module and
+  a 5 Standard : 7 Regulated mix); about $397k cash needed before break-even.
 - Gemini Live is **cost-neutral, not cheaper** on long calls (per-turn context re-billing); its Scale-tier
   value is **latency + data residency**, not cost.
 - Self-host (NVIDIA/Nemotron) only pencils out **above the volume inflection (~60k conversations/mo per tenant)** —
@@ -128,6 +140,12 @@ not forked codebases. "Swap the engine, not the car."
 ## 8. Open risks the specs must keep visible
 
 - Claude per-minute cost ($/min) is the most fragile unit-economics input — load-test to settle.
+- **Resolution rate drives margin under outcome pricing:** at catalogue v1, a 50% (not 70%) resolution
+  rate moves break-even from 18 to 22 tenants. Measure it with the first design partner.
+- **In-country speech processing is the buy trigger:** a simulated buyer panel (20 heads of CX at
+  Nigerian lenders, fintechs, banks and telcos) passed 20 of 20 on the Regulated offer; most named
+  EU-hosted speech processing as the blocker, not price. Treat Sovereign timing as a commercial risk,
+  not only a technical one. Confirm in real discovery calls.
 - Language packs require **labelled Pidgin/Swahili audio data** (the true critical path), not just model access.
 - Nemotron tool-calling reliability is **spike-gated** before any sovereign agentic-actions commitment.
 - Single-engineer dependency risk on the platform/GPU role — staff a backup.

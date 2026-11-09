@@ -38,7 +38,7 @@ This package drives VoiceMe's architecture, planning, and development through
 ## Build order (do not reorder without reading Appendix B)
 
 ```
-MVP 1  → Standard platform GA          (20 packages — fully scaffolded, build now)
+MVP 1  → Standard platform GA          (21 packages — fully scaffolded, build now)
 MVP 2  → Premium / Scale + sovereign   (10 packages — scaffolded, BLOCKED-BY headers gate start)
 MVP 3  → Africa language moat (NVIDIA)  (5 packages — scaffolded, BLOCKED-BY headers gate start)
 Phase 4 → Agentic actions & intelligence (stub in master spec — expand at the time)
@@ -52,7 +52,7 @@ Phase 5 → Scale & expansion             (stub in master spec — expand at the
 `mvp1-knowledge-gap-loop`, `mvp2-follow-through`, `mvp2-complaint-cases`. See "Workflow automations
 (why)" at the end of the MVP 1 section of the phased spec.
 
-All 35 change packages live under `openspec/changes/`. **Every MVP 2/3 proposal carries a
+All 36 change packages live under `openspec/changes/`. **Every MVP 2/3 proposal carries a
 `Status / Blocked-by` header** naming the prerequisite changes that must be archived first —
 AI assistants must honor these (enforced in AGENTS.md).
 
@@ -70,6 +70,8 @@ AI assistants must honor these (enforced in AGENTS.md).
   `mvp2-sovereign-deployment`.
 - `mvp1-workflow-engine` precedes the knowledge-gap loop, follow-through, complaint cases, and Phase 4
   outbound voice; complaint cases also need `mvp2-compliance-evidence`.
+- `mvp1-outcome-billing` follows `usage-metering` + `billing-subscription`; it replaces the minute-tier
+  pricing card with platform + per-resolution pricing held in a versioned catalogue.
 
 ## Why MVP 1 is bigger than it looks
 

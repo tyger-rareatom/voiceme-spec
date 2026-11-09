@@ -47,5 +47,5 @@ criteria are evaluated at session end, off the turn path.
 
 ## Open validation
 - Measured connector latency with the first design partner.
-- Whether per-resolution pricing is margin-positive against the enterprise card (needs data from this
+- Whether per-resolution pricing at catalogue prices (`mvp1-outcome-billing`) is margin-positive (needs data from this
   change before any pricing decision).
